@@ -1,23 +1,24 @@
 import { ScaffoldNode } from '../model/ScaffoldNode';
 
-function getSignature(node: ScaffoldNode): string {
-  let sig = node.selector || '';
-  for (const child of node.children) {
-    sig += '\n' + getSignature(child);
-  }
-  return sig;
-}
-
 export function dedupeSiblings(nodes: ScaffoldNode[]): ScaffoldNode[] {
-  const seenSignatures = new Set<string>();
+  const map = new Map<string, ScaffoldNode>();
   const result: ScaffoldNode[] = [];
   
   for (const node of nodes) {
     node.children = dedupeSiblings(node.children);
     
-    const sig = getSignature(node);
-    if (!seenSignatures.has(sig)) {
-      seenSignatures.add(sig);
+    if (!node.selector) {
+      result.push(node);
+      continue;
+    }
+    
+    if (map.has(node.selector)) {
+      const existing = map.get(node.selector)!;
+      existing.children.push(...node.children);
+      // Re-dedupe their newly merged children
+      existing.children = dedupeSiblings(existing.children);
+    } else {
+      map.set(node.selector, node);
       result.push(node);
     }
   }

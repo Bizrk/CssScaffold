@@ -11,12 +11,17 @@ import { showSuccess, showError } from '../utils/notifications';
 import { getParsingStrategy } from '../utils/languageSupport';
 
 export async function copyFromSelection(editor: vscode.TextEditor): Promise<void> {
-  const text = getSelectionText();
+  let text = getSelectionText();
   
   if (!text) {
      showError('Select some markup first.');
      return;
   }
+
+  // Auto-heal common selection mistakes (missing first/last bracket)
+  text = text.trim();
+  if (!text.startsWith('<') && /^[a-zA-Z]/.test(text)) text = '<' + text;
+  if (!text.endsWith('>')) text = text + '>';
   
   if (!isMarkupSelection(text)) {
      showError('Selection must start with < and end with > to generate a CSS scaffold.');

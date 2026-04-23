@@ -2,7 +2,8 @@
   "name": "css-scaffold",
   "displayName": "CSS Scaffold",
   "description": "Generates a nested SCSS-style scaffold from HTML-like markup selection.",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -15,7 +16,8 @@
     "commands": [
       {
         "command": "cssScaffold.copyFromSelection",
-        "title": "CSS Scaffold: Copy Scaffold from Selection"
+        "title": "Copy Css Scaffold",
+        "category": "CSS Scaffold"
       }
     ],
     "menus": {

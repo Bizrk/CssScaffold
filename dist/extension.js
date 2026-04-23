@@ -21141,21 +21141,21 @@ function pruneIgnoredNodes(nodes) {
 }
 
 // src/transform/dedupeSiblings.ts
-function getSignature(node) {
-  let sig = node.selector || "";
-  for (const child of node.children) {
-    sig += "\n" + getSignature(child);
-  }
-  return sig;
-}
 function dedupeSiblings(nodes) {
-  const seenSignatures = /* @__PURE__ */ new Set();
+  const map = /* @__PURE__ */ new Map();
   const result = [];
   for (const node of nodes) {
     node.children = dedupeSiblings(node.children);
-    const sig = getSignature(node);
-    if (!seenSignatures.has(sig)) {
-      seenSignatures.add(sig);
+    if (!node.selector) {
+      result.push(node);
+      continue;
+    }
+    if (map.has(node.selector)) {
+      const existing = map.get(node.selector);
+      existing.children.push(...node.children);
+      existing.children = dedupeSiblings(existing.children);
+    } else {
+      map.set(node.selector, node);
       result.push(node);
     }
   }
@@ -21237,11 +21237,16 @@ function getParsingStrategy(languageId) {
 
 // src/commands/copyFromSelection.ts
 async function copyFromSelection(editor) {
-  const text = getSelectionText();
+  let text = getSelectionText();
   if (!text) {
     showError("Select some markup first.");
     return;
   }
+  text = text.trim();
+  if (!text.startsWith("<") && /^[a-zA-Z]/.test(text))
+    text = "<" + text;
+  if (!text.endsWith(">"))
+    text = text + ">";
   if (!isMarkupSelection(text)) {
     showError("Selection must start with < and end with > to generate a CSS scaffold.");
     return;
