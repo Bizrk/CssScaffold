@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { copyFromSelection } from './commands/copyFromSelection';
+import { copyHtmlScaffold } from './commands/copyHtmlScaffold';
 
 export function activate(context: vscode.ExtensionContext) {
-    let disposable = vscode.commands.registerCommand('cssScaffold.copyFromSelection', () => {
+    let disposable1 = vscode.commands.registerCommand('cssScaffold.copyFromSelection', () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             copyFromSelection(editor);
@@ -11,7 +12,16 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(disposable);
+    let disposable2 = vscode.commands.registerCommand('cssScaffold.copyHtmlScaffold', () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+            copyHtmlScaffold(editor);
+        } else {
+            vscode.window.showErrorMessage('No active editor.');
+        }
+    });
+
+    context.subscriptions.push(disposable1, disposable2);
 }
 
 export function deactivate() {}

@@ -21273,9 +21273,151 @@ async function copyFromSelection(editor) {
   }
 }
 
+// src/parsing/parseScssToScaffoldTree.ts
+function parseScssToScaffoldTree(scss) {
+  let cleaned = scss.replace(/\/\*[\s\S]*?\*\//g, "");
+  cleaned = cleaned.replace(/\/\/.*$/gm, "");
+  cleaned = cleaned.replace(/"[^"]*"/g, '""').replace(/'[^']*'/g, "''");
+  const tokens = [];
+  let current = "";
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (char === "{" || char === "}" || char === ";") {
+      const t2 = current.trim();
+      if (t2)
+        tokens.push(t2);
+      tokens.push(char);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  const t = current.trim();
+  if (t)
+    tokens.push(t);
+  const rootNodes = [];
+  const stack = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token === "{") {
+      const prev = tokens[i - 1];
+      if (prev && prev !== "{" && prev !== "}" && prev !== ";") {
+        if (prev.startsWith("@")) {
+          stack.push(null);
+        } else {
+          const node = parseSelectorToNode(prev);
+          let parent = null;
+          for (let j = stack.length - 1; j >= 0; j--) {
+            if (stack[j] !== null) {
+              parent = stack[j];
+              break;
+            }
+          }
+          if (parent) {
+            parent.children.push(node);
+          } else {
+            rootNodes.push(node);
+          }
+          stack.push(node);
+        }
+      } else {
+        stack.push(null);
+      }
+    } else if (token === "}") {
+      stack.pop();
+    }
+  }
+  return rootNodes;
+}
+function parseSelectorToNode(sel) {
+  const firstPart = sel.split(",")[0].trim();
+  const parts = firstPart.split(/[\s>+~]+/).filter((p) => p);
+  let target = parts[parts.length - 1] || "";
+  target = target.split(":")[0];
+  let tagName = "div";
+  let id = null;
+  const classes = [];
+  const tagMatch = target.match(/^([a-zA-Z0-9\-]+)/);
+  if (tagMatch) {
+    tagName = tagMatch[1];
+  } else if (target === "") {
+  }
+  const idMatch = target.match(/#([a-zA-Z0-9\-_]+)/);
+  if (idMatch) {
+    id = idMatch[1];
+  }
+  const classRegex = /\.([a-zA-Z0-9\-_]+)/g;
+  let match;
+  while ((match = classRegex.exec(target)) !== null) {
+    classes.push(match[1]);
+  }
+  return {
+    tagName,
+    id,
+    classes,
+    selector: sel,
+    children: []
+  };
+}
+
+// src/output/emitHtmlScaffold.ts
+function emitHtmlScaffold(nodes, indent = "") {
+  let html = "";
+  for (const node of nodes) {
+    let tag = node.tagName || "div";
+    let idAttr = node.id ? ` id="${node.id}"` : "";
+    let classAttr = node.classes.length > 0 ? ` class="${node.classes.join(" ")}"` : "";
+    let openTag = `<${tag}${idAttr}${classAttr}>`;
+    let closeTag = `</${tag}>`;
+    const voidElements = /* @__PURE__ */ new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+    if (voidElements.has(tag.toLowerCase())) {
+      html += `${indent}${openTag}
+`;
+    } else {
+      if (node.children.length > 0) {
+        html += `${indent}${openTag}
+`;
+        html += emitHtmlScaffold(node.children, indent + "  ");
+        html += `${indent}${closeTag}
+`;
+      } else {
+        html += `${indent}${openTag}${closeTag}
+`;
+      }
+    }
+  }
+  return html;
+}
+
+// src/commands/copyHtmlScaffold.ts
+async function copyHtmlScaffold(editor) {
+  let text = getSelectionText();
+  if (!text) {
+    showError("Select some SCSS/CSS structure first.");
+    return;
+  }
+  try {
+    const nodes = parseScssToScaffoldTree(text);
+    if (nodes.length === 0) {
+      showError("Could not find any selectors to scaffold.");
+      return;
+    }
+    const htmlBlock = emitHtmlScaffold(nodes);
+    if (!htmlBlock.trim()) {
+      showError("Could not generate an HTML scaffold from this selection.");
+      return;
+    }
+    await copyToClipboard(htmlBlock);
+    showSuccess("HTML scaffold copied to clipboard.");
+  } catch (err) {
+    console.error(err);
+    showError("Could not generate an HTML scaffold from this selection.");
+  }
+}
+
 // src/extension.ts
 function activate(context) {
-  let disposable = vscode6.commands.registerCommand("cssScaffold.copyFromSelection", () => {
+  let disposable1 = vscode6.commands.registerCommand("cssScaffold.copyFromSelection", () => {
     const editor = vscode6.window.activeTextEditor;
     if (editor) {
       copyFromSelection(editor);
@@ -21283,7 +21425,15 @@ function activate(context) {
       vscode6.window.showErrorMessage("No active editor.");
     }
   });
-  context.subscriptions.push(disposable);
+  let disposable2 = vscode6.commands.registerCommand("cssScaffold.copyHtmlScaffold", () => {
+    const editor = vscode6.window.activeTextEditor;
+    if (editor) {
+      copyHtmlScaffold(editor);
+    } else {
+      vscode6.window.showErrorMessage("No active editor.");
+    }
+  });
+  context.subscriptions.push(disposable1, disposable2);
 }
 function deactivate() {
 }
